@@ -1,76 +1,53 @@
-# IS305 Lab 1 - Dining Meal Booking Feature
+# Lab 2: Dining Booking Credit Extension
 
 ## Student Information
 
-- Student Name: Julie Pokaran Vue
-- Student ID: 240575
-- Course: IS305 Object-Oriented Programming
-- Assignment: Lab 1 - Dining Meal Booking Feature
-- Date: 29 September 2026
+- **Student Name:** Julie Pokaran Vue
+- **Student ID:** 240575
+- **Course:** IS305 Object-Oriented Programming
+- **Technology:** JavaScript and Node.js
+- **Repository:** https://github.com/pokaranvuejulie-oss/IS305-240575.git
 
-## GitHub Repository
+## Description
 
-https://github.com/pokaranvuejulie-oss/IS305-240575
+This project extends the Dining Meal Booking application developed in Lab 1.
 
-## Project Description
+The main purpose of Lab 2 is to introduce a `Student` class and connect Student objects with MealBooking objects. The application demonstrates object-oriented programming concepts including classes, private fields, constructors, getters, setters, object references, arrays of objects, validation, error handling, and booking history.
 
-This project implements a Dining Meal Booking Feature using JavaScript and Node.js.
+No database is required for this application.
 
-The program demonstrates object-oriented programming concepts including classes, objects, constructors, private fields, getters, setters, methods, validation, and error handling.
+## Student Class
 
-The system allows a student to create a meal booking by entering their student ID, student name, meal date, meal type, quantity, and dietary note.
+The `Student` class is stored in `Student.js`.
 
-The program supports three meal types:
+The class contains three private fields:
 
-- Breakfast
-- Lunch
-- Dinner
+- `#studentId`
+- `#firstName`
+- `#lastName`
 
-The meal prices are:
+The constructor initializes these values.
 
-- Breakfast: K10.00
-- Lunch: K15.00
-- Dinner: K20.00
+Getters and setters are provided for all three fields. The setters validate the input and reject empty student IDs, first names, or last names.
 
-The program calculates the total cost based on the selected meal type and quantity.
+The class also contains:
 
-## Files
+- `getFullName()` - returns the student's full name.
+- `displayInfo()` - displays the student's ID and full name.
 
-### MealBooking.js
+## Student and MealBooking Connection
 
-This file contains the `MealBooking` class.
+The `MealBooking` class now receives a `Student` object instead of separately storing the student's ID and name.
 
-The class includes:
+Each booking stores a reference to the Student object.
 
-- Private fields for booking information
-- Constructor for creating booking objects
-- Getters and setters
-- Booking validation
-- Total cost calculation
-- Booking confirmation
-- Booking cancellation
-- Booking summary
+For example:
 
-### DiningApp.js
-
-This file contains the main application.
-
-It:
-
-- Collects booking information using Node.js console input
-- Creates `MealBooking` objects
-- Validates booking information
-- Stores bookings in a JavaScript array
-- Prevents duplicate bookings
-- Confirms valid bookings
-- Displays the booking summary
-- Handles errors without crashing the program
-
-## How to Run
-
-Make sure Node.js is installed.
-
-Open PowerShell in the `AT1_DiningFeature` folder and run:
-
-```text
-node DiningApp.js
+```javascript
+const booking = new MealBooking({
+    student,
+    mealDate,
+    mealType,
+    quantity,
+    dietaryNote
+});

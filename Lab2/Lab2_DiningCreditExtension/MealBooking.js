@@ -6,41 +6,38 @@
   Description: A JavaScript program demonstrating classes,
   objects, constructors, private fields and methods.
 */
+const Student = require("./Student");
 class MealBooking {
-  #studentId;
-  #studentName;
-  #mealDate;
-  #mealType;
-  #quantity;
-  #dietaryNote;
-  #bookingStatus;
+    #student;
+    #mealDate;
+    #mealType;
+    #quantity;
+    #dietaryNote;
+    #bookingStatus;
 
-  constructor({
-    studentId,
-    studentName,
-    mealDate,
-    mealType,
-    quantity,
-    dietaryNote = ""
-  }) {
-    this.#studentId = studentId;
-    this.#studentName = studentName;
-    this.#mealDate = mealDate;
-    this.#mealType = mealType;
-    this.#quantity = quantity;
-    this.#dietaryNote = dietaryNote;
-    this.#bookingStatus = "Pending";
-  }
-      // Getters
+    constructor({
+        student,
+        mealDate,
+        mealType,
+        quantity,
+        dietaryNote = ""
+    }) {
+        if (!(student instanceof Student)) {
+            throw new Error("A valid Student object is required.");
+        }
 
-    get studentId() {
-        return this.#studentId;
+        this.#student = student;
+        this.#mealDate = mealDate;
+        this.#mealType = mealType;
+        this.#quantity = quantity;
+        this.#dietaryNote = dietaryNote;
+        this.#bookingStatus = "Pending";
     }
+    // Getters
 
-    get studentName() {
-        return this.#studentName;
+    get student() {
+        return this.#student;
     }
-
     get mealDate() {
         return this.#mealDate;
     }
@@ -60,16 +57,7 @@ class MealBooking {
     get bookingStatus() {
         return this.#bookingStatus;
     }
-        // Setters
-
-    set studentId(value) {
-        this.#studentId = value;
-    }
-
-    set studentName(value) {
-        this.#studentName = value;
-    }
-
+    // Setters
     set mealDate(value) {
         this.#mealDate = value;
     }
@@ -89,7 +77,7 @@ class MealBooking {
     set bookingStatus(value) {
         this.#bookingStatus = value;
     }
-        // Calculate total meal cost
+    // Calculate total meal cost
     calculateTotal() {
         let price;
 
@@ -105,16 +93,12 @@ class MealBooking {
 
         return price * this.#quantity;
     }
-        // Validate booking information
+    // Validate booking information
     validate() {
         const validMealTypes = ["Breakfast", "Lunch", "Dinner"];
 
-        if (!this.#studentId) {
-            throw new Error("Student ID is required.");
-        }
-
-        if (!this.#studentName) {
-            throw new Error("Student name is required.");
+        if (!(this.#student instanceof Student)) {
+            throw new Error("A valid Student object is required.");
         }
 
         if (!this.#mealDate) {
@@ -131,7 +115,7 @@ class MealBooking {
 
         return true;
     }
-        // Confirm the booking
+    // Confirm the booking
     confirmBooking() {
         this.validate();
         this.#bookingStatus = "Confirmed";
@@ -141,14 +125,14 @@ class MealBooking {
     cancelBooking() {
         this.#bookingStatus = "Cancelled";
     }
-        // Display booking summary
+    // Display booking summary
     getSummary() {
         return `
 ========================================
           BOOKING SUMMARY
 ========================================
-Student: ${this.#studentName}
-Student ID: ${this.#studentId}
+Student: ${this.#student.getFullName()}
+Student ID: ${this.#student.studentId}
 Meal Date: ${this.#mealDate}
 Meal Type: ${this.#mealType}
 Quantity: ${this.#quantity}
@@ -159,4 +143,5 @@ Total Cost: K${this.calculateTotal().toFixed(2)}
 `;
     }
 }
+
 module.exports = MealBooking;
