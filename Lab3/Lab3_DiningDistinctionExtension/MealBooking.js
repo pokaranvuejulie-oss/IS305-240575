@@ -1,0 +1,179 @@
+/*
+  Program: Dining Meal Booking Feature
+  Student Name: Julie Pokaran Vue
+  Student ID: 240575
+  Date: 29 September 2026
+  Description: A JavaScript program demonstrating classes,
+  objects, constructors, private fields and methods.
+*/
+const Student = require("./Student");
+const DiningAccount = require("./DiningAccount");
+class MealBooking {
+    #student;
+    #mealDate;
+    #mealType;
+    #quantity;
+    #dietaryNote;
+    #bookingStatus;
+
+    constructor({
+        student,
+        mealDate,
+        mealType,
+        quantity,
+        dietaryNote = ""
+    }) {
+        if (!(student instanceof Student)) {
+            throw new Error("A valid Student object is required.");
+        }
+
+        this.#student = student;
+        this.#mealDate = mealDate;
+        this.#mealType = mealType;
+        this.#quantity = quantity;
+        this.#dietaryNote = dietaryNote;
+        this.#bookingStatus = "Pending";
+    }
+    // Getters
+
+    get student() {
+        return this.#student;
+    }
+    get mealDate() {
+        return this.#mealDate;
+    }
+
+    get mealType() {
+        return this.#mealType;
+    }
+
+    get quantity() {
+        return this.#quantity;
+    }
+
+    get dietaryNote() {
+        return this.#dietaryNote;
+    }
+
+    get bookingStatus() {
+        return this.#bookingStatus;
+    }
+    // Setters
+    set mealDate(value) {
+        this.#mealDate = value;
+    }
+
+    set mealType(value) {
+        this.#mealType = value;
+    }
+
+    set quantity(value) {
+        this.#quantity = value;
+    }
+
+    set dietaryNote(value) {
+        this.#dietaryNote = value;
+    }
+
+    set bookingStatus(value) {
+        this.#bookingStatus = value;
+    }
+    // Calculate total meal cost
+    calculateTotal() {
+        let price;
+
+        if (this.#mealType === "Breakfast") {
+            price = 10;
+        } else if (this.#mealType === "Lunch") {
+            price = 15;
+        } else if (this.#mealType === "Dinner") {
+            price = 20;
+        } else {
+            return 0;
+        }
+
+        return price * this.#quantity;
+    }
+    // Process payment using the student's dining account
+processPayment(diningAccount) {
+
+    if (!(diningAccount instanceof DiningAccount)) {
+        throw new Error("A valid DiningAccount is required.");
+    }
+
+    if (this.#bookingStatus === "Confirmed") {
+        throw new Error("This booking has already been paid for.");
+    }
+
+    if (this.#bookingStatus === "Cancelled") {
+        throw new Error("A cancelled booking cannot be paid for.");
+    }
+
+    this.validate();
+
+    const totalCost = this.calculateTotal();
+
+    const paymentSuccessful = diningAccount.payForMeal(
+        totalCost,
+        `${this.#mealType} booking - ${this.#mealDate}`
+    );
+
+    if (paymentSuccessful) {
+        this.#bookingStatus = "Confirmed";
+        return true;
+    }
+
+    return false;
+}
+    // Validate booking information
+    validate() {
+        const validMealTypes = ["Breakfast", "Lunch", "Dinner"];
+
+        if (!(this.#student instanceof Student)) {
+            throw new Error("A valid Student object is required.");
+        }
+
+        if (!this.#mealDate) {
+            throw new Error("Meal date is required.");
+        }
+
+        if (!validMealTypes.includes(this.#mealType)) {
+            throw new Error("Meal type must be Breakfast, Lunch, or Dinner.");
+        }
+
+        if (this.#quantity < 1) {
+            throw new Error("Quantity must be at least 1.");
+        }
+
+        return true;
+    }
+    // Confirm the booking
+    confirmBooking() {
+        this.validate();
+        this.#bookingStatus = "Confirmed";
+    }
+
+    // Cancel the booking
+    cancelBooking() {
+        this.#bookingStatus = "Cancelled";
+    }
+    // Display booking summary
+    getSummary() {
+        return `
+========================================
+          BOOKING SUMMARY
+========================================
+Student: ${this.#student.getFullName()}
+Student ID: ${this.#student.studentId}
+Meal Date: ${this.#mealDate}
+Meal Type: ${this.#mealType}
+Quantity: ${this.#quantity}
+Dietary Note: ${this.#dietaryNote || "None"}
+Booking Status: ${this.#bookingStatus}
+Total Cost: K${this.calculateTotal().toFixed(2)}
+========================================
+`;
+    }
+}
+
+module.exports = MealBooking;
