@@ -1,0 +1,52 @@
+[
+  {
+    "requestId": "REQ001",
+    "previousStatus": "Submitted",
+    "newStatus": "Reviewed",
+    "action": "Review Request",
+    "actorId": "OFF001",
+    "actorRole": "Service Officer",
+    "comment": "Request reviewed and approved.",
+    "dateTime": "2026-10-03T05:42:48.153Z"
+  },
+  {
+    "requestId": "REQ001",
+    "previousStatus": "Reviewed",
+    "newStatus": "Assigned",
+    "action": "Assign Technician",
+    "actorId": "OFF001",
+    "actorRole": "Service Officer",
+    "comment": "Technician TECH001 assigned.",
+    "dateTime": "2026-10-03T06:00:25.860Z"
+  },
+  {
+    "requestId": "REQ001",
+    "previousStatus": "Assigned",
+    "newStatus": "In Progress",
+    "action": "Start Work",
+    "actorId": "TECH001",
+    "actorRole": "Technician",
+    "comment": "Technician started work.",
+    "dateTime": "2026-10-03T06:01:22.527Z"
+  },
+  {
+    "requestId": "REQ001",
+    "previousStatus": "In Progress",
+    "newStatus": "Resolved",
+    "action": "Resolve Request",
+    "actorId": "TECH001",
+    "actorRole": "Technician",
+    "comment": "",
+    "dateTime": "2026-10-03T06:03:01.735Z"
+  },
+  {
+    "requestId": "REQ001",
+    "previousStatus": "Resolved",
+    "newStatus": "Closed",
+    "action": "Close Request",
+    "actorId": "OFF001",
+    "actorRole": "Service Officer",
+    "comment": "Request closed.",
+    "dateTime": "2026-10-03T06:04:44.766Z"
+  }
+]

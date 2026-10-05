@@ -38,6 +38,13 @@ class StudentRequester extends User {
     displayInfo() {
         return `${super.displayInfo()} - Programme: ${this.#programme} - Year Level: ${this.#yearLevel}`;
     }
+    toData() {
+    return {
+        ...super.toData(),
+        programme: this.#programme,
+        yearLevel: this.#yearLevel
+    };
+}
 }
 
 module.exports = StudentRequester;

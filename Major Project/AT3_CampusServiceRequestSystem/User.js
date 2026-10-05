@@ -66,7 +66,7 @@ class User {
 ];
 
         if (!validTypes.includes(userType)) {
-            throw new Error("User type must be Student or Staff.");
+        throw new Error("User type must be Student, Staff, Service Officer, or Technician.");
         }
 
         this.#userType = userType;
@@ -112,6 +112,15 @@ if (!validTypes.includes(this.#userType)) {
     displayInfo() {
         return `${this.#userId} - ${this.getFullName()} - ${this.#email} - ${this.#userType}`;
     }
+    toData() {
+    return {
+        userId: this.#userId,
+        firstName: this.#firstName,
+        lastName: this.#lastName,
+        email: this.#email,
+        userType: this.#userType
+    };
+}
 }
 
 module.exports = User;

@@ -123,6 +123,15 @@ System Name: ${this.#systemName}
 Fault Type: ${this.#faultType}
 Network Impact: ${this.#networkImpact}`;
     }
+    toData() {
+    return {
+        ...super.toData(),
+        deviceType: this.#deviceType,
+        systemName: this.#systemName,
+        faultType: this.#faultType,
+        networkImpact: this.#networkImpact
+    };
+}
 }
 
 module.exports = ICTSupportRequest;

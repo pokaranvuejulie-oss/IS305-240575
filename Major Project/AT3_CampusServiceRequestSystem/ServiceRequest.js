@@ -228,18 +228,11 @@ class ServiceRequest {
             "getTargetResolutionHours() must be implemented by a specialised request class."
         );
     }
-      getRequestSummary() {
-        return `Request ID: ${this.#requestId}
-Requester: ${this.#requester.getFullName()}
-Title: ${this.#title}
-Description: ${this.#description}
-Location: ${this.#campusLocation}
-Category: ${this.#category}
-Priority: ${this.#priority}
-Status: ${this.#status}
-Date Submitted: ${this.#dateSubmitted.toLocaleString()}
-Date Updated: ${this.#dateUpdated.toLocaleString()}`;
-    }
+    getRequestSummary() {
+    throw new Error(
+        "getRequestSummary() must be implemented by a specialised request class."
+    );
+}
 
     reviewRequest() {
         if (this.#status !== "Submitted") {
@@ -313,6 +306,60 @@ Date Updated: ${this.#dateUpdated.toLocaleString()}`;
             dateTime: new Date()
         });
     }
+    restoreState(data, technician = null) {
+    const validStatuses = [
+        "Submitted",
+        "Reviewed",
+        "Assigned",
+        "In Progress",
+        "Resolved",
+        "Closed",
+        "Cancelled"
+    ];
+
+    if (!validStatuses.includes(data.status)) {
+        throw new Error("Invalid saved request status.");
+    }
+
+    this.#technician = technician;
+
+    this.#status = data.status;
+
+    this.#dateSubmitted = data.dateSubmitted
+        ? new Date(data.dateSubmitted)
+        : new Date();
+
+    this.#dateUpdated = data.dateUpdated
+        ? new Date(data.dateUpdated)
+        : new Date();
+
+    this.#requestHistory = Array.isArray(data.requestHistory)
+        ? data.requestHistory
+        : [];
+}
+  toData() {
+    return {
+        requestId: this.#requestId,
+
+        requester: this.#requester
+            ? this.#requester.toData()
+            : null,
+
+        technician: this.#technician
+            ? this.#technician.toData()
+            : null,
+
+        title: this.#title,
+        description: this.#description,
+        campusLocation: this.#campusLocation,
+        category: this.#category,
+        priority: this.#priority,
+        status: this.#status,
+        dateSubmitted: this.#dateSubmitted,
+        dateUpdated: this.#dateUpdated,
+        requestHistory: this.#requestHistory
+    };
+}
 }
 
 module.exports = ServiceRequest;  

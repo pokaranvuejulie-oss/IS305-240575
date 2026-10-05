@@ -125,6 +125,15 @@ Room Number: ${this.#roomNumber}
 Hazard Level: ${this.#hazardLevel}
 Equipment Affected: ${this.#equipmentAffected}`;
     }
+    toData() {
+    return {
+        ...super.toData(),
+        building: this.#building,
+        roomNumber: this.#roomNumber,
+        hazardLevel: this.#hazardLevel,
+        equipmentAffected: this.#equipmentAffected
+    };
+}
 }
 
 module.exports = MaintenanceRequest;

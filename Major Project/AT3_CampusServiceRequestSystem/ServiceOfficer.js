@@ -24,6 +24,12 @@ class ServiceOfficer extends User {
     displayInfo() {
         return `${super.displayInfo()} - Service Section: ${this.#serviceSection}`;
     }
+    toData() {
+    return {
+        ...super.toData(),
+        serviceSection: this.#serviceSection
+    };
+}
 }
 
 module.exports = ServiceOfficer;

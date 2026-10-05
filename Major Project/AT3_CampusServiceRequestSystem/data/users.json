@@ -1,0 +1,27 @@
+[
+  {
+    "userId": "STU001",
+    "firstName": "Julie",
+    "lastName": "Vue",
+    "email": "julie@example.com",
+    "userType": "Student",
+    "programme": "Bachelor of Information Systems",
+    "yearLevel": "3"
+  },
+  {
+    "userId": "OFF001",
+    "firstName": "Mary",
+    "lastName": "Bagore",
+    "email": "mary@example.com",
+    "userType": "Service Officer",
+    "serviceSection": "Campus Services"
+  },
+  {
+    "userId": "TECH001",
+    "firstName": "John",
+    "lastName": "Peter",
+    "email": "join@example.com",
+    "userType": "Technician",
+    "technicalSpeciality": "General Campus Maintenance"
+  }
+]

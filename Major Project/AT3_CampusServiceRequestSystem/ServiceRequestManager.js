@@ -1,62 +1,552 @@
+const UserFactory = require("./UserFactory");
+const ServiceRequestFactory = require("./ServiceRequestFactory");
+
 class ServiceRequestManager {
-    constructor() {
+    constructor(
+        userRepository,
+        serviceRequestRepository,
+        requestHistoryRepository,
+        auditRepository
+    ) {
+        this.userRepository = userRepository;
+        this.serviceRequestRepository = serviceRequestRepository;
+        this.requestHistoryRepository = requestHistoryRepository;
+        this.auditRepository = auditRepository;
+
         this.users = [];
-        this.requests = [];
+        this.serviceRequests = [];
+        this.requestHistory = [];
+        this.auditLog = [];
     }
 
-    registerUser(user) {
+    // =========================================================
+    // DATA LOADING
+    // =========================================================
+
+    async loadData() {
+        const userData = await this.userRepository.loadAll();
+
+        this.users = userData.map(data =>
+            UserFactory.createFromData(data)
+        );
+
+        const requestData =
+            await this.serviceRequestRepository.loadAll();
+
+        this.serviceRequests = requestData.map(data =>
+            ServiceRequestFactory.createFromData(data)
+        );
+
+        this.requestHistory =
+            await this.requestHistoryRepository.loadAll();
+
+        this.auditLog =
+            await this.auditRepository.loadAll();
+    }
+
+    // =========================================================
+    // HELPER METHODS
+    // =========================================================
+
+    getActorId(actor) {
+        if (!actor) {
+            return null;
+        }
+
+        if (typeof actor === "string") {
+            return actor;
+        }
+
+        if (typeof actor.getUserId === "function") {
+            return actor.getUserId();
+        }
+
+        if (actor.userId) {
+            return actor.userId;
+        }
+
+        return null;
+    }
+
+    getActor(actor) {
+        const actorId = this.getActorId(actor);
+
+        if (!actorId) {
+            return null;
+        }
+
+        return this.findUserById(actorId);
+    }
+
+    // =========================================================
+    // USER METHODS
+    // =========================================================
+
+    findUserById(userId) {
+        return (
+            this.users.find(
+                user => user.getUserId() === userId
+            ) || null
+        );
+    }
+
+    async registerUser(user, actor = null) {
         user.validate();
 
         if (this.findUserById(user.getUserId())) {
             throw new Error("User ID already exists.");
         }
 
+        await this.userRepository.create(
+            user.toData()
+        );
+
         this.users.push(user);
+
+        const actorObject =
+            this.getActor(actor) || user;
+
+        await this.recordAudit(
+            "Register User",
+            actorObject.getUserId(),
+            actorObject.getUserType(),
+            null,
+            "Success"
+        );
+
         return user;
     }
 
-    findUserById(userId) {
-        return this.users.find(user => user.getUserId() === userId);
+    async updateUser(userId, changes) {
+        const user = this.findUserById(userId);
+
+        if (!user) {
+            throw new Error("User not found.");
+        }
+
+        if (changes.firstName !== undefined) {
+            user.setFirstName(changes.firstName);
+        }
+
+        if (changes.lastName !== undefined) {
+            user.setLastName(changes.lastName);
+        }
+
+        if (changes.email !== undefined) {
+            user.setEmail(changes.email);
+        }
+
+        if (
+            changes.programme !== undefined &&
+            typeof user.setProgramme === "function"
+        ) {
+            user.setProgramme(changes.programme);
+        }
+
+        if (
+            changes.yearLevel !== undefined &&
+            typeof user.setYearLevel === "function"
+        ) {
+            user.setYearLevel(changes.yearLevel);
+        }
+
+        if (
+            changes.department !== undefined &&
+            typeof user.setDepartment === "function"
+        ) {
+            user.setDepartment(changes.department);
+        }
+
+        if (
+            changes.serviceSection !== undefined &&
+            typeof user.setServiceSection === "function"
+        ) {
+            user.setServiceSection(
+                changes.serviceSection
+            );
+        }
+
+        if (
+            changes.technicalSpeciality !== undefined &&
+            typeof user.setTechnicalSpeciality === "function"
+        ) {
+            user.setTechnicalSpeciality(
+                changes.technicalSpeciality
+            );
+        }
+
+        user.validate();
+
+        await this.userRepository.update(
+            userId,
+            user.toData()
+        );
+
+        return user;
     }
 
-    submitRequest(request) {
+    getAllUsers() {
+        return [...this.users];
+    }
+
+    // =========================================================
+    // REQUEST METHODS
+    // =========================================================
+
+    findRequestById(requestId) {
+        return (
+            this.serviceRequests.find(
+                request =>
+                    request.getRequestId() === requestId
+            ) || null
+        );
+    }
+
+    async submitRequest(request, requester) {
         request.validate();
-        if (typeof request.validateSpecialisedFields === "function") {
-            request.validateSpecialisedFields();
-        }
-        if (this.findRequestById(request.getRequestId())) {
-            throw new Error("Request ID already exists.");
+
+        if (
+            this.findRequestById(
+                request.getRequestId()
+            )
+        ) {
+            throw new Error(
+                "Request ID already exists."
+            );
         }
 
-        if (!this.findUserById(request.getRequester().getUserId())) {
-            throw new Error("Requester must be a registered user.");
+        const requesterId =
+            this.getActorId(requester);
+
+        const savedRequester =
+            this.findUserById(requesterId);
+
+        if (!savedRequester) {
+            throw new Error("Requester not found.");
         }
 
-        this.requests.push(request);
+        await this.serviceRequestRepository.create(
+            request.toData()
+        );
+
+        this.serviceRequests.push(request);
+
+        await this.recordHistory(
+            request,
+            null,
+            "Submitted",
+            "Submit Request",
+            savedRequester.getUserId(),
+            savedRequester.getUserType(),
+            "Service request submitted."
+        );
+
+        await this.recordAudit(
+            "Create Service Request",
+            savedRequester.getUserId(),
+            savedRequester.getUserType(),
+            request.getRequestId(),
+            "Success"
+        );
+
         return request;
     }
-    reviewRequest(requestId, officerId, comment = "") {
-        const request = this.findRequestById(requestId);
+
+    async updateRequest(
+        requestId,
+        requesterId,
+        changes
+    ) {
+        const request =
+            this.findRequestById(requestId);
 
         if (!request) {
-            throw new Error("Request not found.");
+            throw new Error(
+                "Service request not found."
+            );
         }
 
-        const officer = this.findUserById(officerId);
+        if (
+            request.getRequester().getUserId() !==
+            requesterId
+        ) {
+            throw new Error(
+                "Unauthorized: only the requester can update this request."
+            );
+        }
+
+        if (request.getStatus() !== "Submitted") {
+            throw new Error(
+                "Request can only be updated while it is Submitted."
+            );
+        }
+
+        request.updateDetails(
+            changes.title,
+            changes.description,
+            changes.campusLocation
+        );
+
+        if (changes.priority !== undefined) {
+            request.setPriority(
+                changes.priority
+            );
+        }
+
+        await this.serviceRequestRepository.update(
+            requestId,
+            request.toData()
+        );
+
+        return request;
+    }
+
+    async cancelRequest(
+        requestId,
+        requesterId
+    ) {
+        const request =
+            this.findRequestById(requestId);
+
+        if (!request) {
+            throw new Error(
+                "Service request not found."
+            );
+        }
+
+        if (
+            request.getRequester().getUserId() !==
+            requesterId
+        ) {
+            throw new Error(
+                "Unauthorized: only the requester can cancel this request."
+            );
+        }
+
+        const requester =
+            this.findUserById(requesterId);
+
+        if (!requester) {
+            throw new Error(
+                "Requester not found."
+            );
+        }
+
+        const previousStatus =
+            request.getStatus();
+
+        request.cancelRequest();
+
+        await this.serviceRequestRepository.update(
+            requestId,
+            request.toData()
+        );
+
+        await this.recordHistory(
+            request,
+            previousStatus,
+            "Cancelled",
+            "Cancel Request",
+            requesterId,
+            requester.getUserType(),
+            "Service request cancelled."
+        );
+
+        await this.recordAudit(
+            "Cancel Request",
+            requesterId,
+            requester.getUserType(),
+            requestId,
+            "Success"
+        );
+
+        return request;
+    }
+
+    getAllRequests() {
+        return [...this.serviceRequests];
+    }
+
+    getRequestsByRequester(requesterId) {
+        return this.serviceRequests.filter(
+            request =>
+                request
+                    .getRequester()
+                    .getUserId() === requesterId
+        );
+    }
+
+    getRequestsByTechnician(technicianId) {
+        return this.serviceRequests.filter(
+            request =>
+                request.getTechnician() &&
+                request
+                    .getTechnician()
+                    .getUserId() === technicianId
+        );
+    }
+
+    // =========================================================
+    // SEARCH
+    // =========================================================
+
+    searchRequests(criteria = {}) {
+        let results = [
+            ...this.serviceRequests
+        ];
+
+        if (criteria.keyword) {
+            const keyword =
+                criteria.keyword.toLowerCase();
+
+            results = results.filter(request => {
+                const searchableText = [
+                    request.getRequestId(),
+                    request.getTitle(),
+                    request.getDescription(),
+                    request.getCampusLocation(),
+                    request.getCategory(),
+                    request.getPriority(),
+                    request.getStatus(),
+                    request
+                        .getRequester()
+                        .getFullName()
+                ]
+                    .join(" ")
+                    .toLowerCase();
+
+                return searchableText.includes(
+                    keyword
+                );
+            });
+        }
+
+        if (criteria.requesterId) {
+            results = results.filter(
+                request =>
+                    request
+                        .getRequester()
+                        .getUserId() ===
+                    criteria.requesterId
+            );
+        }
+
+        if (criteria.technicianId) {
+            results = results.filter(
+                request =>
+                    request.getTechnician() &&
+                    request
+                        .getTechnician()
+                        .getUserId() ===
+                    criteria.technicianId
+            );
+        }
+
+        if (criteria.category) {
+            results = results.filter(
+                request =>
+                    request.getCategory() ===
+                    criteria.category
+            );
+        }
+
+        if (criteria.priority) {
+            results = results.filter(
+                request =>
+                    request.getPriority() ===
+                    criteria.priority
+            );
+        }
+
+        if (criteria.status) {
+            results = results.filter(
+                request =>
+                    request.getStatus() ===
+                    criteria.status
+            );
+        }
+
+        if (criteria.location) {
+            results = results.filter(
+                request =>
+                    request
+                        .getCampusLocation()
+                        .toLowerCase() ===
+                    criteria.location.toLowerCase()
+            );
+        }
+
+        if (criteria.sortBy === "priority") {
+            results.sort(
+                (a, b) =>
+                    b.calculatePriorityScore() -
+                    a.calculatePriorityScore()
+            );
+        }
+
+        if (criteria.sortBy === "date") {
+            results.sort(
+                (a, b) =>
+                    new Date(
+                        b.getDateSubmitted()
+                    ) -
+                    new Date(
+                        a.getDateSubmitted()
+                    )
+            );
+        }
+
+        return results;
+    }
+
+    // =========================================================
+    // REVIEW
+    // =========================================================
+
+    async reviewRequest(
+        requestId,
+        officerId,
+        comment = "Request reviewed and approved."
+    ) {
+        const request =
+            this.findRequestById(requestId);
+
+        if (!request) {
+            throw new Error(
+                "Service request not found."
+            );
+        }
+
+        const officer =
+            this.findUserById(officerId);
 
         if (!officer) {
-            throw new Error("Service Officer not found.");
+            throw new Error(
+                "Service Officer not found."
+            );
         }
 
-        if (officer.getUserType() !== "Service Officer") {
-            throw new Error("Only Service Officers can review requests.");
+        if (
+            officer.getUserType() !==
+            "Service Officer"
+        ) {
+            throw new Error(
+                "Only a Service Officer can review requests."
+            );
         }
 
-        const previousStatus = request.getStatus();
+        const previousStatus =
+            request.getStatus();
 
         request.reviewRequest();
 
-        request.addHistoryEntry(
+        await this.serviceRequestRepository.update(
+            requestId,
+            request.toData()
+        );
+
+        await this.recordHistory(
+            request,
             previousStatus,
             request.getStatus(),
             "Review Request",
@@ -65,153 +555,307 @@ class ServiceRequestManager {
             comment
         );
 
-        return request;
-    }
-        changePriority(requestId, officerId, newPriority, comment = "") {
-        const request = this.findRequestById(requestId);
-
-        if (!request) {
-            throw new Error("Request not found.");
-        }
-
-        const officer = this.findUserById(officerId);
-
-        if (!officer) {
-            throw new Error("Service Officer not found.");
-        }
-
-        if (officer.getUserType() !== "Service Officer") {
-            throw new Error("Only Service Officers can change priority.");
-        }
-
-        const previousPriority = request.getPriority();
-
-        request.setPriority(newPriority);
-
-        request.addHistoryEntry(
-            request.getStatus(),
-            request.getStatus(),
-            "Change Priority",
+        await this.recordAudit(
+            "Review Request",
             officerId,
             officer.getUserType(),
-            `${comment} Priority changed from ${previousPriority} to ${newPriority}.`
+            requestId,
+            "Success"
         );
 
         return request;
     }
 
-    assignTechnician(requestId, officerId, technicianId, comment = "") {
-        const request = this.findRequestById(requestId);
+    // =========================================================
+    // CHANGE PRIORITY
+    // =========================================================
+
+    async changePriority(
+        requestId,
+        priority,
+        actorId
+    ) {
+        const request =
+            this.findRequestById(requestId);
 
         if (!request) {
-            throw new Error("Request not found.");
+            throw new Error(
+                "Service request not found."
+            );
         }
 
-        const officer = this.findUserById(officerId);
+        const actor =
+            this.findUserById(actorId);
+
+        if (!actor) {
+            throw new Error(
+                "User not found."
+            );
+        }
+
+        if (
+            actor.getUserType() !==
+                "Service Officer" &&
+            actor.getUserType() !==
+                "System Administrator"
+        ) {
+            throw new Error(
+                "Only a Service Officer or System Administrator can change priority."
+            );
+        }
+
+        request.setPriority(priority);
+
+        await this.serviceRequestRepository.update(
+            requestId,
+            request.toData()
+        );
+
+        await this.recordAudit(
+            "Change Priority",
+            actorId,
+            actor.getUserType(),
+            requestId,
+            "Success"
+        );
+
+        return request;
+    }
+
+    // =========================================================
+    // ASSIGN TECHNICIAN
+    // =========================================================
+
+    async assignTechnician(
+        requestId,
+        technician,
+        officerId
+    ) {
+        const request =
+            this.findRequestById(requestId);
+
+        if (!request) {
+            throw new Error(
+                "Service request not found."
+            );
+        }
+
+        const officer =
+            this.findUserById(officerId);
 
         if (!officer) {
-            throw new Error("Service Officer not found.");
+            throw new Error(
+                "Service Officer not found."
+            );
         }
 
-        if (officer.getUserType() !== "Service Officer") {
-            throw new Error("Only Service Officers can assign technicians.");
+        if (
+            officer.getUserType() !==
+            "Service Officer"
+        ) {
+            throw new Error(
+                "Only a Service Officer can assign technicians."
+            );
         }
-
-        const technician = this.findUserById(technicianId);
 
         if (!technician) {
-            throw new Error("Technician not found.");
+            throw new Error(
+                "Technician not found."
+            );
         }
 
-        if (technician.getUserType() !== "Technician") {
-            throw new Error("Selected user is not a Technician.");
+        const technicianId =
+            this.getActorId(technician);
+
+        const savedTechnician =
+            this.findUserById(technicianId);
+
+        if (!savedTechnician) {
+            throw new Error(
+                "Technician not found."
+            );
         }
 
-        const previousStatus = request.getStatus();
+        if (
+            savedTechnician.getUserType() !==
+            "Technician"
+        ) {
+            throw new Error(
+                "Selected user is not a Technician."
+            );
+        }
 
-        request.assignTechnician(technician);
+        const previousStatus =
+            request.getStatus();
 
-        request.addHistoryEntry(
+        request.assignTechnician(
+            savedTechnician
+        );
+
+        await this.serviceRequestRepository.update(
+            requestId,
+            request.toData()
+        );
+
+        await this.recordHistory(
+            request,
             previousStatus,
             request.getStatus(),
             "Assign Technician",
             officerId,
             officer.getUserType(),
-            comment
+            `Technician ${technicianId} assigned.`
+        );
+
+        await this.recordAudit(
+            "Assign Technician",
+            officerId,
+            officer.getUserType(),
+            requestId,
+            "Success"
         );
 
         return request;
     }
-        startWork(requestId, technicianId, comment = "") {
-        const request = this.findRequestById(requestId);
+
+    // =========================================================
+    // START WORK
+    // =========================================================
+
+    async startWork(
+        requestId,
+        technicianId
+    ) {
+        const request =
+            this.findRequestById(requestId);
 
         if (!request) {
-            throw new Error("Request not found.");
+            throw new Error(
+                "Service request not found."
+            );
         }
 
-        const technician = this.findUserById(technicianId);
+        const technician =
+            this.findUserById(technicianId);
 
         if (!technician) {
-            throw new Error("Technician not found.");
+            throw new Error(
+                "Technician not found."
+            );
         }
 
-        if (technician.getUserType() !== "Technician") {
-            throw new Error("Only Technicians can start work.");
+        if (
+            technician.getUserType() !==
+            "Technician"
+        ) {
+            throw new Error(
+                "Only a Technician can start work."
+            );
         }
 
-        if (!request.getTechnician()) {
-            throw new Error("No technician has been assigned to this request.");
+        if (
+            !request.getTechnician() ||
+            request
+                .getTechnician()
+                .getUserId() !==
+                technicianId
+        ) {
+            throw new Error(
+                "Unauthorized: this technician is not assigned to the request."
+            );
         }
 
-        if (request.getTechnician().getUserId() !== technicianId) {
-            throw new Error("Only the assigned Technician can start work.");
-        }
-
-        const previousStatus = request.getStatus();
+        const previousStatus =
+            request.getStatus();
 
         request.startWork();
 
-        request.addHistoryEntry(
+        await this.serviceRequestRepository.update(
+            requestId,
+            request.toData()
+        );
+
+        await this.recordHistory(
+            request,
             previousStatus,
             request.getStatus(),
             "Start Work",
             technicianId,
             technician.getUserType(),
-            comment
+            "Technician started work."
+        );
+
+        await this.recordAudit(
+            "Start Work",
+            technicianId,
+            technician.getUserType(),
+            requestId,
+            "Success"
         );
 
         return request;
     }
-        resolveRequest(requestId, technicianId, comment = "") {
-        const request = this.findRequestById(requestId);
+
+    // =========================================================
+    // RESOLVE REQUEST
+    // =========================================================
+
+    async resolveRequest(
+        requestId,
+        technicianId,
+        comment = ""
+    ) {
+        const request =
+            this.findRequestById(requestId);
 
         if (!request) {
-            throw new Error("Request not found.");
+            throw new Error(
+                "Service request not found."
+            );
         }
 
-        const technician = this.findUserById(technicianId);
+        const technician =
+            this.findUserById(technicianId);
 
         if (!technician) {
-            throw new Error("Technician not found.");
+            throw new Error(
+                "Technician not found."
+            );
         }
 
-        if (technician.getUserType() !== "Technician") {
-            throw new Error("Only Technicians can resolve requests.");
+        if (
+            technician.getUserType() !==
+            "Technician"
+        ) {
+            throw new Error(
+                "Only a Technician can resolve requests."
+            );
         }
 
-        if (!request.getTechnician()) {
-            throw new Error("No technician has been assigned to this request.");
+        if (
+            !request.getTechnician() ||
+            request
+                .getTechnician()
+                .getUserId() !==
+                technicianId
+        ) {
+            throw new Error(
+                "Unauthorized: this technician is not assigned to the request."
+            );
         }
 
-        if (request.getTechnician().getUserId() !== technicianId) {
-            throw new Error("Only the assigned Technician can resolve this request.");
-        }
-
-        const previousStatus = request.getStatus();
+        const previousStatus =
+            request.getStatus();
 
         request.resolveRequest();
 
-        request.addHistoryEntry(
+        await this.serviceRequestRepository.update(
+            requestId,
+            request.toData()
+        );
+
+        await this.recordHistory(
+            request,
             previousStatus,
             request.getStatus(),
             "Resolve Request",
@@ -220,30 +864,65 @@ class ServiceRequestManager {
             comment
         );
 
+        await this.recordAudit(
+            "Resolve Request",
+            technicianId,
+            technician.getUserType(),
+            requestId,
+            "Success"
+        );
+
         return request;
     }
-        closeRequest(requestId, officerId, comment = "") {
-        const request = this.findRequestById(requestId);
+
+    // =========================================================
+    // CLOSE REQUEST
+    // =========================================================
+
+    async closeRequest(
+        requestId,
+        officerId,
+        comment = "Request closed."
+    ) {
+        const request =
+            this.findRequestById(requestId);
 
         if (!request) {
-            throw new Error("Request not found.");
+            throw new Error(
+                "Service request not found."
+            );
         }
 
-        const officer = this.findUserById(officerId);
+        const officer =
+            this.findUserById(officerId);
 
         if (!officer) {
-            throw new Error("Service Officer not found.");
+            throw new Error(
+                "Service Officer not found."
+            );
         }
 
-        if (officer.getUserType() !== "Service Officer") {
-            throw new Error("Only Service Officers can close requests.");
+        if (
+            officer.getUserType() !==
+            "Service Officer"
+        ) {
+            throw new Error(
+                "Only a Service Officer can close requests."
+            );
         }
 
-        const previousStatus = request.getStatus();
+        const previousStatus =
+            request.getStatus();
 
         request.closeRequest();
 
-        request.addHistoryEntry(
+        await this.serviceRequestRepository.update(
+            requestId,
+            request.toData()
+        );
+
+        await this.recordHistory(
+            request,
             previousStatus,
             request.getStatus(),
             "Close Request",
@@ -252,170 +931,463 @@ class ServiceRequestManager {
             comment
         );
 
-        return request;
-    }
-
-    findRequestById(requestId) {
-        return this.requests.find(
-            request => request.getRequestId() === requestId
+        await this.recordAudit(
+            "Close Request",
+            officerId,
+            officer.getUserType(),
+            requestId,
+            "Success"
         );
-    }
-
-    getRequestsByUser(userId) {
-        return this.requests.filter(
-            request => request.getRequester().getUserId() === userId
-        );
-    }
-
-    getAllRequests() {
-        return this.requests;
-    }
-
-    updateRequest(requestId, userId, changes) {
-        const request = this.findRequestById(requestId);
-
-        if (!request) {
-            throw new Error("Request not found.");
-        }
-
-        if (request.getRequester().getUserId() !== userId) {
-            throw new Error("You can only update your own request.");
-        }
-
-        request.updateDetails(changes);
 
         return request;
     }
 
-       cancelRequest(requestId, userId) {
-        const request = this.findRequestById(requestId);
+    // =========================================================
+    // REQUEST HISTORY
+    // =========================================================
 
-        if (!request) {
-            throw new Error("Request not found.");
-        }
-
-        if (request.getRequester().getUserId() !== userId) {
-            throw new Error("You can only cancel your own request.");
-        }
-
-        const previousStatus = request.getStatus();
-
-        request.cancelRequest();
-
-        const requester = this.findUserById(userId);
-
-        request.addHistoryEntry(
+    async recordHistory(
+        request,
+        previousStatus,
+        newStatus,
+        action,
+        actorId,
+        actorRole,
+        comment = ""
+    ) {
+        const entry = {
+            requestId:
+                request.getRequestId(),
             previousStatus,
-            request.getStatus(),
-            "Cancel Request",
-            userId,
-            requester.getUserType(),
-            "Request cancelled by requester."
+            newStatus,
+            action,
+            actorId,
+            actorRole,
+            comment,
+            dateTime:
+                new Date().toISOString()
+        };
+
+        this.requestHistory.push(entry);
+
+        await this.requestHistoryRepository.saveAll(
+            this.requestHistory
         );
 
-        return request;
+        return entry;
     }
 
-    searchRequests(searchText) {
-        const search = searchText.toLowerCase();
-
-        return this.requests.filter(request =>
-            request.getRequestId().toLowerCase().includes(search) ||
-            request.getTitle().toLowerCase().includes(search)
+    getRequestHistory(requestId) {
+        return this.requestHistory.filter(
+            entry =>
+                entry.requestId === requestId
         );
     }
 
-    getRequestSummaryByStatus() {
-        const summary = {};
+    // =========================================================
+    // AUDIT
+    // =========================================================
 
-        this.requests.forEach(request => {
-            const status = request.getStatus();
+    async recordAudit(
+        action,
+        actorId,
+        actorRole,
+        requestId = null,
+        outcome = "Success"
+    ) {
+        const entry = {
+            dateTime:
+                new Date().toISOString(),
+            action,
+            actorId,
+            actorRole,
+            requestId,
+            outcome
+        };
 
-            if (!summary[status]) {
-                summary[status] = 0;
-            }
+        this.auditLog.push(entry);
 
-            summary[status]++;
-        });
+        await this.auditRepository.saveAll(
+            this.auditLog
+        );
 
-        return summary;
+        return entry;
     }
 
-    filterRequests(filters = {}) {
-        return this.requests.filter(request => {
-            if (
-                filters.category &&
-                request.getCategory() !== filters.category
-            ) {
-                return false;
+    getAuditLog() {
+        return [...this.auditLog];
+    }
+
+    // =========================================================
+    // REPORT 1
+    // REQUESTS BY CATEGORY
+    // =========================================================
+
+    getRequestSummaryByCategory() {
+        const report = {};
+
+        for (const request of this.serviceRequests) {
+            const category =
+                request.getCategory();
+
+            report[category] =
+                (report[category] || 0) + 1;
+        }
+
+        return report;
+    }
+
+    // =========================================================
+    // REPORT 2
+    // REQUESTS BY PRIORITY
+    // =========================================================
+
+    getRequestSummaryByPriority() {
+        const report = {};
+
+        for (const request of this.serviceRequests) {
+            const priority =
+                request.getPriority();
+
+            report[priority] =
+                (report[priority] || 0) + 1;
+        }
+
+        return report;
+    }
+
+    // =========================================================
+    // REPORT 3
+    // URGENT REQUESTS
+    // =========================================================
+
+    getUrgentRequests() {
+        return this.serviceRequests.filter(
+            request =>
+                request.getPriority() ===
+                "Urgent"
+        );
+    }
+
+    // =========================================================
+    // REPORT 4
+    // REQUESTS BY TECHNICIAN
+    // =========================================================
+
+    getRequestsByTechnician() {
+        const report = {};
+
+        for (const request of this.serviceRequests) {
+            const technician =
+                request.getTechnician();
+
+            if (!technician) {
+                continue;
             }
 
-            if (
-                filters.status &&
-                request.getStatus() !== filters.status
-            ) {
-                return false;
-            }
+            const technicianId =
+                technician.getUserId();
+
+            report[technicianId] =
+                (report[technicianId] || 0) + 1;
+        }
+
+        return report;
+    }
+
+    // =========================================================
+    // REPORT 5
+    // COMPLETED REQUESTS BY TECHNICIAN
+    // =========================================================
+
+    getCompletedRequestsByTechnician() {
+        const report = {};
+
+        const completedStatuses = [
+            "Resolved",
+            "Closed"
+        ];
+
+        for (const request of this.serviceRequests) {
+            const technician =
+                request.getTechnician();
 
             if (
-                filters.priority &&
-                request.getPriority() !== filters.priority
+                !technician ||
+                !completedStatuses.includes(
+                    request.getStatus()
+                )
             ) {
-                return false;
+                continue;
             }
 
-            if (filters.technicianId) {
-                const technician = request.getTechnician();
+            const technicianId =
+                technician.getUserId();
+
+            report[technicianId] =
+                (report[technicianId] || 0) + 1;
+        }
+
+        return report;
+    }
+
+    // =========================================================
+    // REPORT 6
+    // REQUEST VOLUME BY LOCATION
+    // =========================================================
+
+    getRequestVolumeByLocation() {
+        const report = {};
+
+        for (const request of this.serviceRequests) {
+            const location =
+                request.getCampusLocation();
+
+            report[location] =
+                (report[location] || 0) + 1;
+        }
+
+        return report;
+    }
+
+    // =========================================================
+    // REPORT 7
+    // AVERAGE RESOLUTION TIME
+    // =========================================================
+
+    getAverageResolutionTimeHours() {
+        const completedRequests =
+            this.serviceRequests.filter(
+                request =>
+                    request.getStatus() ===
+                        "Resolved" ||
+                    request.getStatus() ===
+                        "Closed"
+            );
+
+        if (
+            completedRequests.length === 0
+        ) {
+            return 0;
+        }
+
+        let totalHours = 0;
+        let count = 0;
+
+        for (const request of completedRequests) {
+            const history =
+                this.getRequestHistory(
+                    request.getRequestId()
+                );
+
+            const submittedEntry =
+                history.find(
+                    entry =>
+                        entry.newStatus ===
+                        "Submitted"
+                );
+
+            const resolvedEntry =
+                history.find(
+                    entry =>
+                        entry.newStatus ===
+                        "Resolved"
+                );
+
+            if (
+                submittedEntry &&
+                resolvedEntry
+            ) {
+                const start =
+                    new Date(
+                        submittedEntry.dateTime
+                    );
+
+                const end =
+                    new Date(
+                        resolvedEntry.dateTime
+                    );
+
+                const hours =
+                    (end - start) /
+                    (1000 * 60 * 60);
+
+                if (hours >= 0) {
+                    totalHours += hours;
+                    count++;
+                }
+            }
+        }
+
+        if (count === 0) {
+            return 0;
+        }
+
+        return totalHours / count;
+    }
+
+    // =========================================================
+    // REPORT 8
+    // OVERDUE REQUESTS
+    // =========================================================
+
+    getOverdueRequests() {
+        const now = new Date();
+
+        return this.serviceRequests.filter(
+            request => {
+                const status =
+                    request.getStatus();
 
                 if (
-                    !technician ||
-                    technician.getUserId() !== filters.technicianId
+                    status === "Closed" ||
+                    status === "Cancelled"
                 ) {
                     return false;
                 }
+
+                const submitted =
+                    new Date(
+                        request.getDateSubmitted()
+                    );
+
+                const elapsedHours =
+                    (now - submitted) /
+                    (1000 * 60 * 60);
+
+                const targetHours =
+                    request.getTargetResolutionHours();
+
+                return (
+                    elapsedHours >
+                    targetHours
+                );
             }
-
-            return true;
-        });
-    }
-        sortRequests(sortBy = "dateSubmitted") {       
-        const sortedRequests = [...this.requests];
-
-        if (sortBy === "dateSubmitted") {
-            return sortedRequests.sort(
-                (a, b) =>
-                    new Date(a.getDateSubmitted()) -
-                    new Date(b.getDateSubmitted())
-            );
-        }
-
-        if (sortBy === "priority") {
-            const priorityOrder = {
-                Urgent: 4,
-                High: 3,
-                Normal: 2,
-                Low: 1
-            };
-
-            return sortedRequests.sort(
-                (a, b) =>
-                    priorityOrder[b.getPriority()] -
-                    priorityOrder[a.getPriority()]
-            );
-        }
-
-        throw new Error(
-            "Sort option must be dateSubmitted or priority."
         );
     }
-        getRequestHistory(requestId) {
-        const request = this.findRequestById(requestId);
 
-        if (!request) {
-            throw new Error("Request not found.");
+    // =========================================================
+    // REPORT 9
+    // PRIORITY SCORE REPORT
+    // =========================================================
+
+    getPriorityScoreReport() {
+        return this.serviceRequests
+            .map(request => ({
+                requestId:
+                    request.getRequestId(),
+
+                category:
+                    request.getCategory(),
+
+                priority:
+                    request.getPriority(),
+
+                priorityScore:
+                    request.calculatePriorityScore(),
+
+                targetResolutionHours:
+                    request.getTargetResolutionHours(),
+
+                status:
+                    request.getStatus()
+            }))
+            .sort(
+                (a, b) =>
+                    b.priorityScore -
+                    a.priorityScore
+            );
+    }
+
+    // =========================================================
+    // REPORT 10
+    // DASHBOARD REPORT
+    // =========================================================
+
+    getDashboardReport() {
+        const summary = {
+            totalRequests:
+                this.serviceRequests.length,
+
+            submitted: 0,
+            reviewed: 0,
+            assigned: 0,
+            inProgress: 0,
+            resolved: 0,
+            closed: 0,
+            cancelled: 0,
+
+            totalUsers:
+                this.users.length,
+
+            students: 0,
+            staff: 0,
+            serviceOfficers: 0,
+            technicians: 0,
+
+            urgentRequests:
+                this.getUrgentRequests().length,
+
+            overdueRequests:
+                this.getOverdueRequests().length,
+
+            averageResolutionTimeHours:
+                this.getAverageResolutionTimeHours()
+        };
+
+        for (const request of this.serviceRequests) {
+            switch (request.getStatus()) {
+                case "Submitted":
+                    summary.submitted++;
+                    break;
+
+                case "Reviewed":
+                    summary.reviewed++;
+                    break;
+
+                case "Assigned":
+                    summary.assigned++;
+                    break;
+
+                case "In Progress":
+                    summary.inProgress++;
+                    break;
+
+                case "Resolved":
+                    summary.resolved++;
+                    break;
+
+                case "Closed":
+                    summary.closed++;
+                    break;
+
+                case "Cancelled":
+                    summary.cancelled++;
+                    break;
+            }
         }
 
-        return request.getRequestHistory();
+        for (const user of this.users) {
+            switch (user.getUserType()) {
+                case "Student":
+                    summary.students++;
+                    break;
+
+                case "Staff":
+                    summary.staff++;
+                    break;
+
+                case "Service Officer":
+                    summary.serviceOfficers++;
+                    break;
+
+                case "Technician":
+                    summary.technicians++;
+                    break;
+            }
+        }
+
+        return summary;
     }
 }
 

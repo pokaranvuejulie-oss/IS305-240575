@@ -24,6 +24,12 @@ class StaffRequester extends User {
     displayInfo() {
         return `${super.displayInfo()} - Department: ${this.#department}`;
     }
+    toData() {
+    return {
+        ...super.toData(),
+        department: this.#department
+    };
+}
 }
 
 module.exports = StaffRequester;

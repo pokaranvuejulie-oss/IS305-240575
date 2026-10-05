@@ -140,6 +140,15 @@ Hygiene Risk: ${this.#hygieneRisk}
 Service Type: ${this.#serviceType}
 Preferred Service Time: ${this.#preferredServiceTime}`;
     }
+    toData() {
+    return {
+        ...super.toData(),
+        cleaningArea: this.#cleaningArea,
+        hygieneRisk: this.#hygieneRisk,
+        serviceType: this.#serviceType,
+        preferredServiceTime: this.#preferredServiceTime
+    };
+}
 }
 
 module.exports = CleaningRequest;

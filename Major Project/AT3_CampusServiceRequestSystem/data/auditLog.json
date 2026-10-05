@@ -1,0 +1,84 @@
+[
+  {
+    "auditId": "AUDIT-1791005274618-150",
+    "actorId": "STU001",
+    "actorRole": "Student",
+    "action": "Register User",
+    "requestId": null,
+    "description": "User Julie Vue was registered.",
+    "dateTime": "2026-10-03T05:27:54.619Z",
+    "outcome": "Success"
+  },
+  {
+    "auditId": "AUDIT-1791005391642-325",
+    "actorId": "STU001",
+    "actorRole": "Student",
+    "action": "Create Service Request",
+    "requestId": "REQ001",
+    "description": "Service request \"Student Notice Board\" was created.",
+    "dateTime": "2026-10-03T05:29:51.642Z",
+    "outcome": "Success"
+  },
+  {
+    "auditId": "AUDIT-1791005754739-453",
+    "actorId": "OFF001",
+    "actorRole": "Service Officer",
+    "action": "Register User",
+    "requestId": null,
+    "description": "User Mary Bagore was registered.",
+    "dateTime": "2026-10-03T05:35:54.739Z",
+    "outcome": "Success"
+  },
+  {
+    "auditId": "AUDIT-1791005819480-511",
+    "actorId": "TECH001",
+    "actorRole": "Technician",
+    "action": "Register User",
+    "requestId": null,
+    "description": "User John Peter was registered.",
+    "dateTime": "2026-10-03T05:36:59.480Z",
+    "outcome": "Success"
+  },
+  {
+    "auditId": "AUDIT-1791006168162-880",
+    "actorId": "OFF001",
+    "actorRole": "Service Officer",
+    "action": "Review Request",
+    "requestId": "REQ001",
+    "description": "Request reviewed. Status changed from Submitted to Reviewed.",
+    "dateTime": "2026-10-03T05:42:48.162Z",
+    "outcome": "Success"
+  },
+  {
+    "dateTime": "2026-10-03T06:00:25.863Z",
+    "action": "Assign Technician",
+    "actorId": "OFF001",
+    "actorRole": "Service Officer",
+    "requestId": "REQ001",
+    "outcome": "Success"
+  },
+  {
+    "dateTime": "2026-10-03T06:01:22.528Z",
+    "action": "Start Work",
+    "actorId": "TECH001",
+    "actorRole": "Technician",
+    "requestId": "REQ001",
+    "outcome": "Success"
+  },
+  {
+    "dateTime": "2026-10-03T06:03:01.737Z",
+    "action": "Resolve Request",
+    "actorId": "TECH001",
+    "actorRole": "Technician",
+    "requestId": "REQ001",
+    "outcome": "Success"
+  },
+  {
+    "dateTime": "2026-10-03T06:04:44.768Z",
+    "action": "Close Request",
+    "actorId": "OFF001",
+    "actorRole": "Service Officer",
+    "requestId": "REQ001",
+    "outcome": "Success"
+  }
+]
